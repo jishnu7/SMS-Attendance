@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.    
 '''
 # SMS Attendance
-# Version : 0.4
+# Version : 0.6
 # Author  : jishnu7@gmail.com
  
 DBHOST = "localhost"
@@ -74,10 +74,10 @@ def fetch(username, passwd, mobnum) :
         percent = search[len_search-1].contents[0].next
         detail_sem = search[len_search-4].contents[0]['value']
     except:
-        f = open('attendance-log.txt','a+')
+        f = open('attendance-account-delete.log','a+')
         f.write(username+" "+mobnum+"\n")
         f.close()
-        msg = "SMS Attendance :- "+username + ", Invalid username. Your current registraion is deleted. Please re-register at http://attendance.thecodecracker.com"
+        msg = "SMS Attendance \r\n"+username + ", Invalid username. Your current registraion is deleted. Please re-register at http://attendance.thecodecracker.com"
         send_sms(msg, mobnum)
         query = "DELETE FROM users WHERE username = '"+username+"' LIMIT 1"
         error = db.cursor()
@@ -105,7 +105,7 @@ def fetch(username, passwd, mobnum) :
     details_var = BeautifulSoup(details_var)
 
     # Default SMS Message. without detailed information
-    msg = "SMS Attendance :- Name : "+ username.split(".")[0].capitalize() + ". No of Hours Attended : " + numHours+" Total Hours Engaged : " + totHours+" Attendance : " + percent + "%"
+    msg = "SMS Attendance \r\nName : "+ username.split(".")[0].capitalize() + " \r\nNo of Hours Attended : " + numHours+" \r\nTotal Hours Engaged : " + totHours+" \r\nAttendance : " + percent + "%"
 
     # We need detailed info only if we able to successfullt get the data.
     try: 
@@ -134,12 +134,12 @@ def fetch(username, passwd, mobnum) :
 
         if detail[6] != '\n\t\n\tDeveloped by Focuz Infotech Kochi, in association with Campus Network Cell, MESCE. &#169; MES College of Engineering Kuttippuram':
             # Append the detailed info to the messafe and send sms
-            msg = msg + " Last Day "+detail[0] + ": "+detail[1]+" "+detail[2]+" "+detail[3]+" "+detail[4]+" "+detail[5]+" "+detail[6]
+            msg = msg + " \r\nLast Day "+detail[0] + ": "+detail[1]+" "+detail[2]+" "+detail[3]+" "+detail[4]+" "+detail[5]+" "+detail[6]
         send_sms(msg, mobnum)
 
     except:
         send_sms(msg, mobnum)
-        f = open('attendance-detail-failed.txt','a+')
+        f = open('attendance-detail-failed.log','a+')
         f.write(username+"\n")
         f.close()
 
