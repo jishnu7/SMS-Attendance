@@ -40,12 +40,13 @@ FOS_PASS = ''
 # Set Cookie for FullOnSMS and log in.
 sms_cookie = cookielib.CookieJar()
 sms_opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(sms_cookie))
+sms_opener.addheaders.append(('User-agent', 'Mozilla/5.0 (compatible)'))
 sms_login = sms_opener.open('http://www.fullonsms.com/CheckLogin.php?MobileNoLogin='+FOS_USER+'&LoginPassword='+FOS_PASS)
 
 
 # Function to send SMS
 def send_sms(message, mobileNum) :
-    sms_data = urllib.urlencode({'CancelScript' : '/home.php', 'MobileNos' : mobileNum, 'SelGroup' : "", 'Message' : message, "Gender" : "0", "FriendName" : "Your Friend Name", "ETemplatesId" : "", "TabValue" : "contacts", 'IntSubmit' : 'I agree - Send SMS'})
+    sms_data = urllib.urlencode({'ActionScript' : '/home.php','CancelScript' : '/home.php', 'HtmlTemplate' : '/var/www/html/fullonsms/StaticSpamWarning.html','MessageLength': '140', 'MobileNos' : mobileNum, 'SelGroup' : "", 'Message' : message, "Gender" : "0", "FriendName" : "Your Friend Name", "ETemplatesId" : "", "TabValue" : "contacts", 'IntSubmit' : 'I agree - Send SMS'})
     sms_page = sms_opener.open('http://www.fullonsms.com/home.php',sms_data)
     print message, "\nSuccess\n"
 
