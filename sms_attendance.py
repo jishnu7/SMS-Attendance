@@ -1,6 +1,6 @@
 '''
     SMS Attendance
-    Copyright (C) 2010-2011 jishnu7@gmail.com
+    Copyright (C) 2010-2012 jishnu7@gmail.com
     
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,45 +16,60 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.    
 '''
 # SMS Attendance
-# Version : 0.6
+# Version : 1.0b
 # Author  : jishnu7@gmail.com
- 
-DBHOST = "localhost"
-DBUSER = " "
-DBPASS = " "
-DB = " "
 
 import urllib
 import urllib2
-import cookielib
 from BeautifulSoup import BeautifulSoup
 import datetime
-import MySQLdb
+import cPickle
+import os
+from db import *
+from fullonsms import *
+from accounts import *
 
-db = MySQLdb.connect(host=DBHOST, user=DBUSER, passwd=DBPASS, db=DB)
-
-# FullOnSMS credentials
-FOS_USER = ''
-FOS_PASS = ''
-
-# Set Cookie for FullOnSMS and log in.
-sms_cookie = cookielib.CookieJar()
-sms_opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(sms_cookie))
-sms_opener.addheaders.append(('User-agent', 'Mozilla/5.0 (compatible)'))
-sms_login = sms_opener.open('http://www.fullonsms.com/CheckLogin.php?MobileNoLogin='+FOS_USER+'&LoginPassword='+FOS_PASS)
+# To avoid continous deletion of accounts, incase college website is not accessible
+DEL_MAX = 2
+DEL_COUNT = 0
+DEL_QUEUE = []
+DEL_FILENAME = 'attendance-account-delete.log'
 
 
-# Function to send SMS
-def send_sms(message, mobileNum) :
-    sms_data = urllib.urlencode({'ActionScript' : '/home.php','CancelScript' : '/home.php', 'HtmlTemplate' : '/var/www/html/fullonsms/StaticSpamWarning.html','MessageLength': '140', 'MobileNos' : mobileNum, 'SelGroup' : "", 'Message' : message, "Gender" : "0", "FriendName" : "Your Friend Name", "ETemplatesId" : "", "TabValue" : "contacts", 'IntSubmit' : 'I agree - Send SMS'})
-    sms_page = sms_opener.open('http://www.fullonsms.com/home.php',sms_data)
-    print message, "\nSuccess\n"
+class Pickle():
+    ''' Class to manage pickling operations '''
+    def __init__(self, filename):
+        self.filename = filename
+
+
+    def pickling(self, data, permission = 'wb'):
+        ''' Save to pickle file '''
+        pfile = open(self.filename, permission)
+        cPickle.dump(data, pfile)
+        pfile.close()
+        return
+
+
+    def unpickling(self):
+        ''' Get values from pickle file '''
+        data = []
+        if os.path.isfile(self.filename):
+            pfile = open(self.filename, 'rb')
+            data = cPickle.load(pfile)
+            pfile.close()
+            return data['last_user']
+        else:
+            return 0
 
 
 # Function to fetch info from college website
-def fetch(username, passwd, mobnum) :
+def fetch_attendance(username, passwd, mobnum):
+    global DEL_MAX
+    global DEL_QUEUE
+    global DEL_COUNT
+    global DEL_FILENAME
+
     print username
-    
     # Set Cookie and log into college website
     cj = cookielib.CookieJar()
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
@@ -75,16 +90,28 @@ def fetch(username, passwd, mobnum) :
         percent = search[len_search-1].contents[0].next
         detail_sem = search[len_search-4].contents[0]['value']
     except:
-        f = open('attendance-account-delete.log','a+')
-        f.write(username+" "+mobnum+"\n")
-        f.close()
-        msg = "SMS Attendance \r\n"+username + ", Invalid username. Your current registraion is deleted. Please re-register at http://attendance.thecodecracker.com"
-        send_sms(msg, mobnum)
-        query = "DELETE FROM users WHERE username = '"+username+"' LIMIT 1"
-        error = db.cursor()
-        error.execute(query)
-        return
+        DEL_COUNT += 1
+        print DEL_COUNT
+        if DEL_COUNT < DEL_MAX:
+            # Write to log file
+            f = open(DEL_FILENAME,'a+')
+            f.write(str(datetime.date.today().day)+"-"+str(datetime.date.today().month)+" DELETE "+username+" "+str(mobnum)+"\n")
+            f.close()
+            # Delete from database
+            delete_db = database()
+            delete_db.delete(username)
+            # Send message to user
+            msg = "SMS Attendance \r\n"+username + ", Invalid username. Your current registraion is deleted. Please re-register at http://attendance.thecodecracker.com"
+            return msg
+        else:
+            # Restore from account delete log if max consecutive deletion occured
+            db = database()
+            db.restore(DEL_FILENAME)
+            # Print erro, and exit from program
+            print "ERROR : "+str(DEL_MAX)+" accounts deletd continuously"
+            sys.exit (1)
 
+    DEL_COUNT = 0
     # set date values for detail info
     d1 = "1"
     m1 = datetime.date.today().month
@@ -109,47 +136,81 @@ def fetch(username, passwd, mobnum) :
     msg = "SMS Attendance \r\nName : "+ username.split(".")[0].capitalize() + " \r\nNo of Hours Attended : " + numHours+" \r\nTotal Hours Engaged : " + totHours+" \r\nAttendance : " + percent + "%"
 
     # We need detailed info only if we able to successfullt get the data.
-    try: 
-        search_details = details_var.findAll(attrs={"class" : "tfont"})
-        temp_detail = list()
-        len_detail =len(search_details)
-        for x in range(len_detail-17,len_detail-2):
-            try:
-                temp_detail.append(str(search_details[x].contents[0].contents[0]))
-            except:
+    try:
+        search_detail = details_var.find('td','errfont')
+        # If there is no error message
+        if search_detail == None:
+            search_details = details_var.findAll(attrs={"class" : "tfont"})
+            temp_detail = list()
+            len_detail =len(search_details)
+            for x in range(len_detail-17,len_detail-2):
                 try:
-                    temp_detail.append(str(search_details[x].contents[0]))
+                    temp_detail.append(str(search_details[x].contents[0].contents[0]))
                 except:
-                    temp_detail.append("-")
-        detail = list()
-        detail.append(temp_detail[8].split("-")[0]+"/"+temp_detail[8].split("-")[1])
-        if temp_detail[0] == temp_detail[8]:
-            for x in range(1,7):
-                if temp_detail[x] == "-":
-                    detail.append(temp_detail[x+8])
-                else:
+                    try:
+                        temp_detail.append(str(search_details[x].contents[0]))
+                    except:
+                        temp_detail.append("-")
+            detail = list()
+            detail.append(temp_detail[8].split("-")[0]+"/"+temp_detail[8].split("-")[1])
+            if temp_detail[0] == temp_detail[8]:
+                for x in range(1,7):
+                    if temp_detail[x] == "-":
+                        detail.append(temp_detail[x+8])
+                    else:
+                        detail.append(temp_detail[x])
+            else:
+                for x in range(9,15):
                     detail.append(temp_detail[x])
-        else:
-            for x in range(9,15):
-                detail.append(temp_detail[x])
 
-        if detail[6] != '\n\t\n\tDeveloped by Focuz Infotech Kochi, in association with Campus Network Cell, MESCE. &#169; MES College of Engineering Kuttippuram':
-            # Append the detailed info to the messafe and send sms
+            # Append the detailed info to the message
             msg = msg + " \r\nLast Day "+detail[0] + ": "+detail[1]+" "+detail[2]+" "+detail[3]+" "+detail[4]+" "+detail[5]+" "+detail[6]
-        send_sms(msg, mobnum)
 
     except:
-        send_sms(msg, mobnum)
         f = open('attendance-detail-failed.log','a+')
         f.write(username+"\n")
         f.close()
+    return msg
 
-cursor = db.cursor()
-cursor.execute("SELECT username, passwd, sem, mob, disabled FROM users")
-rows = int(cursor.rowcount)
 
-for x in range(0,rows):
-    row = cursor.fetchone()
-    # Passout students account will be disabled.
-    if row[4] == 0:
-	fetch(row[0], row[1], row[3])
+def send_one_by_one(previous, pck):
+    db = database()
+    last_user_num = previous
+
+    for account in ACCOUNTS:
+        # Import message sender class
+        exec('import '+account['class']+' as import_file')
+        sms_class = getattr(import_file, account['class'])
+        sms = sms_class(account['username'], account['password'])
+        print "asd"
+        # To avoid infinite loop
+        loop = 0
+        while loop<2:
+            user = db.fetch_one(last_user_num)
+            if user == None:
+                last_user_num = 0
+                loop+=1
+                continue
+            message = fetch_attendance(user[0], user[1], user[3])
+            if sms.send(message, user[3]) == False:
+                break
+            last_user_num += 1
+            pck.pickling({'last_user' : last_user_num})
+            # In case, message sent to all accounts.
+            if last_user_num == previous:
+                return last_user_num
+        if loop == 2:
+            return last_user_num
+
+
+if __name__ == "__main__":
+    # Limit number of account on each run. 0 for all accounts
+    #LIMIT = 100
+    pck = Pickle('attendance_lastupdate.p')
+    previous = pck.unpickling()
+    
+    db = database()
+    #users, last_user_num = db.fetch(previous['last_user'], LIMIT)
+    last_user = send_one_by_one(previous, pck)
+
+    pck.pickling({'last_user' : last_user})
