@@ -1,3 +1,4 @@
+#!/usr/bin/python
 '''
     SMS Attendance
     Copyright (C) 2010-2012 jishnu7@gmail.com
@@ -16,7 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.    
 '''
 # SMS Attendance
-# Version : 1.0b
 # Author  : jishnu7@gmail.com
 
 import urllib
@@ -91,7 +91,6 @@ def fetch_attendance(username, passwd, mobnum):
         detail_sem = search[len_search-4].contents[0]['value']
     except:
         DEL_COUNT += 1
-        print DEL_COUNT
         if DEL_COUNT < DEL_MAX:
             # Write to log file
             f = open(DEL_FILENAME,'a+')
@@ -107,12 +106,13 @@ def fetch_attendance(username, passwd, mobnum):
             # Restore from account delete log if max consecutive deletion occured
             db = database()
             db.restore(DEL_FILENAME)
-            # Print erro, and exit from program
+            # Print error, and exit from program
             print "ERROR : "+str(DEL_MAX)+" accounts deletd continuously"
             sys.exit (1)
 
     DEL_COUNT = 0
     # set date values for detail info
+    # From date
     d1 = "1"
     m1 = datetime.date.today().month
     y1 = datetime.date.today().year
@@ -122,6 +122,7 @@ def fetch_attendance(username, passwd, mobnum):
         if m1 == 0:
             m1 = "12"
             y1 =  y1 -1
+    # To date, today
     d2 = datetime.date.today().day
     m2 = datetime.date.today().month
     y2 = datetime.date.today().year
@@ -135,13 +136,13 @@ def fetch_attendance(username, passwd, mobnum):
     # Default SMS Message. without detailed information
     msg = "SMS Attendance \r\nName : "+ username.split(".")[0].capitalize() + " \r\nNo of Hours Attended : " + numHours+" \r\nTotal Hours Engaged : " + totHours+" \r\nAttendance : " + percent + "%"
 
-    # We need detailed info only if we able to successfullt get the data.
-    try:
-        search_detail = details_var.find('td','errfont')
-        # If there is no error message
-        if search_detail == None:
+    # If there is no error message
+    search_detail = details_var.find('td','errfont')
+    if search_detail == None:
+        try:
             search_details = details_var.findAll(attrs={"class" : "tfont"})
             temp_detail = list()
+            # Total length of table
             len_detail =len(search_details)
             for x in range(len_detail-17,len_detail-2):
                 try:
@@ -152,25 +153,36 @@ def fetch_attendance(username, passwd, mobnum):
                     except:
                         temp_detail.append("-")
             detail = list()
-            detail.append(temp_detail[8].split("-")[0]+"/"+temp_detail[8].split("-")[1])
-            if temp_detail[0] == temp_detail[8]:
-                for x in range(1,7):
-                    if temp_detail[x] == "-":
-                        detail.append(temp_detail[x+8])
-                    else:
+            update_day = temp_detail[8].split("-")[0]
+            update_month = temp_detail[8].split("-")[1]
+            update_year = temp_detail[8].split("-")[2]
+            update_date = update_year+'-'+update_month+'-'+update_day
+            update_check = database()
+            # Send message only if there is a new update.
+            if update_check.update_check(username, update_date):
+                # date in date-month format
+                detail.append(update_day+"/"+update_month)
+                if temp_detail[0] == temp_detail[8]:
+                    for x in range(1,7):
+                        if temp_detail[x] == "-":
+                            detail.append(temp_detail[x+8])
+                        else:
+                            detail.append(temp_detail[x])
+                else:
+                    for x in range(9,15):
                         detail.append(temp_detail[x])
-            else:
-                for x in range(9,15):
-                    detail.append(temp_detail[x])
-
-            # Append the detailed info to the message
-            msg = msg + " \r\nLast Day "+detail[0] + ": "+detail[1]+" "+detail[2]+" "+detail[3]+" "+detail[4]+" "+detail[5]+" "+detail[6]
-
-    except:
-        f = open('attendance-detail-failed.log','a+')
-        f.write(username+"\n")
-        f.close()
-    return msg
+                # add today to database
+                update_check.update(username, update_date)
+                # Append the detailed info to the message
+                msg = msg + " \r\nLast Day "+detail[0] + ": "+detail[1]+" "+detail[2]+" "+detail[3]+" "+detail[4]+" "+detail[5]+" "+detail[6]
+                return msg
+        except:
+            print  "----------------------\n"+"ERROR while getting details"+"\n----------------------"
+    print "Details not found. Skipping user"
+    f = open('attendance-detail-failed.log','a+')
+    f.write(str(d2)+"-"+str(m2)+"-"+str(y2)+" "+username+"\n")
+    f.close()
+    return None
 
 
 def send_one_by_one(previous, pck):
@@ -181,26 +193,27 @@ def send_one_by_one(previous, pck):
         # Import message sender class
         exec('import '+account['class']+' as import_file')
         sms_class = getattr(import_file, account['class'])
-        sms = sms_class(account['username'], account['password'])
-        print "asd"
-        # To avoid infinite loop
-        loop = 0
-        while loop<2:
-            user = db.fetch_one(last_user_num)
-            if user == None:
-                last_user_num = 0
-                loop+=1
-                continue
-            message = fetch_attendance(user[0], user[1], user[3])
-            if sms.send(message, user[3]) == False:
-                break
-            last_user_num += 1
-            pck.pickling({'last_user' : last_user_num})
-            # In case, message sent to all accounts.
-            if last_user_num == previous:
+        sms = sms_class()
+        if sms.login(account['username'], account['password']) == True:
+            # To avoid infinite loop
+            loop = 0
+            while loop<2:
+                user = db.fetch_one(last_user_num)
+                if user == None:
+                    last_user_num = 0
+                    loop+=1
+                    continue
+                message = fetch_attendance(user[0], user[1], user[3])
+                if message:
+                    if sms.send(message, user[3]) == False:
+                        break
+                last_user_num += 1
+                pck.pickling({'last_user' : last_user_num})
+                # In case, message sent to all accounts.
+                if last_user_num == previous:
+                    return last_user_num
+            if loop == 2:
                 return last_user_num
-        if loop == 2:
-            return last_user_num
 
 
 if __name__ == "__main__":
