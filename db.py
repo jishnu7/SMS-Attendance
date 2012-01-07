@@ -136,6 +136,7 @@ class database():
             print "No update"
             return False
 
+
     def update(self, username, date):
         # Update last access date in user account
         cursor = self.db.cursor()
