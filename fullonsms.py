@@ -1,3 +1,4 @@
+#!/usr/bin/python
 '''
     SMS Attendance
     Copyright (C) 2010-2012 jishnu7@gmail.com
@@ -23,33 +24,33 @@ from BeautifulSoup import BeautifulSoup
 
 
 class fullonsms():
-    def __init__(self, username, password):
+    def __init__(self):
         # Set Cookie for FullOnSMS and log in.
         sms_cookie = cookielib.CookieJar()
         self.sms_opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(sms_cookie))
         self.sms_opener.addheaders.append(('User-agent', 'Mozilla/5.0'))
 
+    def login(self, username, password):
         # Login
         sms_login = self.sms_opener.open('http://www.fullonsms.com/CheckLogin.php?MobileNoLogin='+username+'&LoginPassword='+password)
 
-        print "Login : "+username
+        print "----------------------\n"+"Login : "+username+"\n----------------------"
         # Check Login is success or not.
-        # Not needed for me. Incase if you need, you can't use __init__
-        '''
         sms_login = BeautifulSoup(sms_login)
         redirect = sms_login.find('meta', {'http-equiv' : "Refresh"})
-        if redirect['content'] != '5;URL= http://www.fullonsms.com/login.php':
-            # Login success
-            return True
-        else:
+        try:
+            if redirect['content'] != '5;URL= http://www.fullonsms.com/login.php':
+                # Login success
+                return True
+        except:
             # Login Failed
-            return False
-        '''
+            print "Login Failed"
+        return False
 
 
     # Function to send SMS
     def send(self, message, mobile_num) :
-        # success message
+        # success message, to check whether message is sent or not.
         MSG = { 'h1' : 'Hurray!!', 'div' : 'SMS sent successfully' }
         
         sms_data = urllib.urlencode({
@@ -72,12 +73,14 @@ class fullonsms():
         success_page = self.sms_opener.open('http://www.fullonsms.com/MsgSent.php')
         success_page = BeautifulSoup(success_page)
         success_page = success_page.find('div', {'class' : 'dhtmlgoodies', 'id' : 'div1'})
-        # added 'or' intentionally, just incase they changed text
-        if success_page.find('h1').contents[0].strip() == MSG['h1'] or success_page.find('div', 'lightbox_black_point').contents[0].strip() == MSG['div']:
-            # Success
-            print message
-            return True
-        else:
+
+        try:
+            # added 'or' intentionally, just incase they changed text
+            if success_page.find('h1').contents[0].strip() == MSG['h1'] or success_page.find('div', 'lightbox_black_point').contents[0].strip() == MSG['div']:
+                # Success
+                print message
+                return True
+        except:
             # Message sent failed
             print "MESSAGE SENT FAILED!"
-            return False
+        return False

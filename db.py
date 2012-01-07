@@ -1,3 +1,4 @@
+#!/usr/bin/python
 '''
     SMS Attendance
     Copyright (C) 2010-2012 jishnu7@gmail.com
@@ -56,7 +57,7 @@ class database():
 
                 try:
                     cursor = self.db.cursor()
-                    cursor.execute("SELECT username, passwd FROM users WHERE `username`='"+account+"' AND `mob`='"+mob+"'")
+                    cursor.execute("SELECT `username` FROM `users` WHERE `username`='"+account+"' AND `mob`='"+mob+"'")
                     rows = int(cursor.rowcount)
                     if rows > 0:
                         continue
@@ -119,3 +120,28 @@ class database():
             return None
 
 
+    def update_check(self, username, date):
+        # Check whether there is an update after last access
+        print "Update check : ",username, date
+        cursor = self.db.cursor()
+        query = "SELECT `mob` FROM `users` WHERE ( `last_update` < '"+date+"' OR  `last_update` IS NULL ) AND `username` = '"+username+"' LIMIT 1"
+        try:
+            cursor.execute(query)
+        except MySQLdb.Error, e:
+            print "Error %d: %s" % (e.args[0], e.args[1])
+        rows = int(cursor.rowcount)
+        if rows > 0:
+            return True
+        else:
+            print "No update"
+            return False
+
+    def update(self, username, date):
+        # Update last access date in user account
+        cursor = self.db.cursor()
+        query = "UPDATE `users` SET `last_update`='"+date   +"' WHERE `username`='"+username+"' LIMIT 1"
+        try:
+            cursor.execute(query)
+        except MySQLdb.Error, e:
+            print "Error %d: %s" % (e.args[0], e.args[1])
+        return

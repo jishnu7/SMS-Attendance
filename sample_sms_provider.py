@@ -1,8 +1,9 @@
+#!/usr/bin/python
 
 class sample_sms_provider():
     def __init__(self):
         # Set Cookie
-        print "Setting cookie
+        print "Setting cookie"
 
     def login(self, username, password):
         # Login
