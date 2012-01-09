@@ -35,7 +35,8 @@ DEL_MAX = 2
 DEL_COUNT = 0
 DEL_QUEUE = []
 DEL_FILENAME = 'attendance-account-delete.log'
-
+PICKLE_FILE = 'attendance-lastupdate.pck'
+DETAIL_FAILED_FILE = 'attendance-detail-failed.log'
 
 class Pickle():
     ''' Class to manage pickling operations '''
@@ -156,10 +157,10 @@ def fetch_attendance(username, passwd, mobnum):
           + " \r\nTotal Hours Engaged : " + totHours \
           + " \r\nAttendance : " + percent + "%"
 
-    # If there is no error message
-    search_detail = details_var.find('td', 'errfont')
-    if search_detail == None:
-        try:
+    try:
+        # If there is no error message
+        search_detail = details_var.find('td', 'errfont')
+        if search_detail == None:
             search_details = details_var.findAll(attrs={"class": "tfont"})
             temp_detail = list()
             # Total length of table
@@ -204,12 +205,12 @@ def fetch_attendance(username, passwd, mobnum):
                           + detail[5] + " " \
                           + detail[6]
                 return msg
-        except:
-            print  "----------------------\n" + \
-                   "ERROR while getting details" + \
-                   "\n----------------------"
+    except:
+        print  "----------------------\n" + \
+               "ERROR while getting details" + \
+               "\n----------------------"
     print "Details not found. Skipping user"
-    f = open('attendance-detail-failed.log', 'a+')
+    f = open(DETAIL_FAILED_FILE, 'a+')
     f.write(str(d2) + "-" + str(m2) + "-" + str(y2) + " " + username + "\n")
     f.close()
     return None
@@ -247,13 +248,13 @@ def send_one_by_one(previous, pck):
 
 
 if __name__ == "__main__":
-    # Limit number of account on each run. 0 for all accounts
-    #LIMIT = 100
-    pck = Pickle('attendance_lastupdate.p')
+    pck = Pickle(PICKLE_FILE)
     previous = pck.unpickling()
 
     db = database()
-    #users, last_user_num = db.fetch(previous['last_user'], LIMIT)
     last_user = send_one_by_one(previous, pck)
-
     pck.pickling({'last_user': last_user})
+
+    # Limit number of account on each run. 0 for all accounts
+    #LIMIT = 100
+    #users, last_user_num = db.fetch(previous['last_user'], LIMIT)
