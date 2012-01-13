@@ -241,7 +241,8 @@ def send_one_by_one(previous, pck):
                 last_user_num += 1
                 pck.pickling({'last_user': last_user_num})
                 # In case, message sent to all accounts.
-                if last_user_num == previous:
+                if last_user_num == previous or \
+                    (last_user_num - 1 == 0 and loop == 1):
                     return last_user_num
             if loop == 2:
                 return last_user_num
