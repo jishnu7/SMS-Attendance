@@ -2,6 +2,4 @@ SMS Attendance
 --------------
 Please note that this program is strictly based on the structure of our college's website (ww.mesce.ac.in). So it won't work for any other college's website.
 
-You can use sms_attendance_without_db.py to test the program.
-
 For more info : http://blog.thecodecracker.com/hacks/attendance-sms/
