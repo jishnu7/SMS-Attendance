@@ -252,7 +252,6 @@ if __name__ == "__main__":
     pck = Pickle(PICKLE_FILE)
     previous = pck.unpickling()
 
-    db = database()
     last_user = send_one_by_one(previous, pck)
     pck.pickling({'last_user': last_user})
 
