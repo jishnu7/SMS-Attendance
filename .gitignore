@@ -1,0 +1,6 @@
+*.pyc
+*.pck
+*.log
+files/*
+test/*
+sms_test.py
