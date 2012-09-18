@@ -50,7 +50,7 @@ class fullonsms():
  
         try:
             if login_detail.script.contents[0] == \
-                "window.location.href = 'http://www.fullonsms.com/landing_page.php';":
+                "window.location.href = 'http://www.fullonsms.com/action_main.php';":
                 # Login success
                 return True
         except:
